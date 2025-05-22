@@ -5,16 +5,21 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import androidx.fragment.app.Fragment
-import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import ru.otus.coroutineshomework.databinding.FragmentTimerBinding
+import java.time.Instant
 import java.util.Locale
+import kotlin.coroutines.coroutineContext
 import kotlin.properties.Delegates
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.DurationUnit
+import kotlin.time.toDuration
 
 class TimerFragment : Fragment() {
 
@@ -74,12 +79,32 @@ class TimerFragment : Fragment() {
         outState.putBoolean(STARTED, started)
     }
 
+    private var timer: Job? = null
+    private lateinit var timerStartedAt: Instant
+
+    private fun getTimeDuration(): Duration {
+        return (Instant.now().toEpochMilli() - timerStartedAt.toEpochMilli()).toDuration(
+            DurationUnit.MILLISECONDS
+        )
+    }
+
+    private suspend fun doTimerLoops() {
+        while (coroutineContext.isActive) {
+            time = getTimeDuration()
+            delay(16) // 1/60 Hz
+        }
+    }
+
     private fun startTimer() {
-        // TODO: Start timer
+        timerStartedAt = Instant.now()
+        timer = CoroutineScope(Dispatchers.Main).launch {
+            doTimerLoops()
+        }
     }
 
     private fun stopTimer() {
-        // TODO: Stop timer
+        timer?.cancel()
+        time = getTimeDuration()
     }
 
     override fun onDestroyView() {
@@ -96,7 +121,7 @@ class TimerFragment : Fragment() {
             "%02d:%02d.%03d",
             this.inWholeMinutes.toInt(),
             this.inWholeSeconds.toInt(),
-            this.inWholeMilliseconds.toInt()
+            this.inWholeMilliseconds.toInt().mod(1000)
         )
     }
 }
